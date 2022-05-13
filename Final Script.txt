@@ -1,0 +1,167 @@
+param (
+    $filecheck
+)
+
+#Challenge 1
+#Counts the number of services
+(Get-Service | Measure-Object).Count
+(get-service).count
+
+#Help commands for service
+help *service
+get-command -noun service
+
+#Restarts the spooler service
+restart-service spooler
+--------------------------------------------------------------------------------------------------
+#Challenge 2
+
+Get-wmiobject win32_service | Where-Object {$_.state -eq "Running"} | Select Name,Status,@{L='StartupType';E={$_.StartMode}},@{L='FileLocation';E={$_.Path}} | Format-Table
+
+Get-wmiobject win32_service | Select Name,Status,@{L='StartupType';E={$_.StartMode}},@{L='FileLocation';E={$_.Path}} | Format-Table
+---------------------------------------------------------------------------------------------------
+#Challenge 3
+#Checking to see if file exists if not it creates it.
+
+$FileName = "C:\Users\Administrator\Desktop\Reports\Report_$(get-date -f yyyy-MM-dd).htm"
+if (Test-Path $FileName) {
+    Write-Host "File Exists" -ForegroundColor Cyan
+}
+else
+{ Write-Host "File Created!" -ForegroundColor Cyan
+    Get-wmiobject win32_service | Where-Object {$_.state -eq "Running"} | Select Name,Status,@{L='StartupType';E={$_.StartMode}},@{L='FileLocation';E={$_.Path}} | convertto-html | out-file -filepath $FileName
+}
+
+
+$FileName2 = "C:\Users\Administrator\Desktop\Reports\Report_details_$(get-date -f yyyy-MM-dd).json"
+if (Test-Path $FileName2) {
+    Write-Host "File Exists" -ForegroundColor Cyan
+}
+else
+{Write-Host "File Created!" -ForegroundColor Cyan;
+    Get-wmiobject win32_service | Select Name,Status,@{L='StartupType';E={$_.StartMode}},@{L='FileLocation';E={$_.Path}} | ConvertTo-Json | out-file -filepath $FileName2
+    }
+
+#Remove item if older than 30 days
+Get-ChildItem –Path "C:\Users\Administrator\Desktop\Reports\" -Recurse | Where-Object {($_.LastWriteTime -lt (Get-Date).AddDays(-30))} | Remove-Item
+---------------------------------------------------------------------------------------------------------
+#Challenge 4
+#Checking to see if HTML and JSON reports were created today
+
+$filecheck = get-childitem "C:\Users\Administrator\Desktop\Reports\Report_$(get-date -f yyyy-MM-dd).htm" | Where-Object {$_.LastWriteTime.ToShortDateString() -eq (get-date).ToShortDateString()}
+if ($filecheck.count -eq 1) {
+    write-host 'Service Report was created today.' -ForegroundColor Cyan
+    }
+    Else { 
+        Write-Warning 'Service Report was not created today!'
+        }
+
+ $filecheck = get-childitem "C:\Users\Administrator\Desktop\Reports\Report_details_$(get-date -f yyyy-MM-dd).json" | Where-Object {$_.LastWriteTime.ToShortDateString() -eq (get-date).ToShortDateString()}
+if ($filecheck.count -eq 1) {
+    write-host 'Service Details Report was created today.' -ForegroundColor Cyan
+    }
+    Else { 
+        Write-Warning 'Service Details Report was not created today!' }
+
+#Check to see if files in spooler folder are older than 6 hours, if they are restart the service.
+
+Get-ChildItem C:\Users\Administrator\Desktop\Spooler | Foreach { `
+$creationtime=$_.creationTime; `
+$nowtime = get-date; `
+if (($nowtime - $creationtime).totalhours -gt 6) `
+{ `
+Write-Host "File created within 6 hours "$_.Name; `
+} `
+else `
+{ `
+Restart-Service -Name Spooler; `
+Write-Host "Print Service Restarted" -ForegroundColor Cyan; `
+} `
+}
+--------------------------------------------------------------------------------------------------------
+#Challenge 5
+#Create service reports for today
+param(
+$HTMLexport = 'C:\Users\Administrator\Desktop\Reports',
+$JSONexport = 'C:\Users\Administrator\Desktop\Reports'
+)
+
+
+if (Test-Path "$HTMLexport\$(get-date -f yyyy-MM-dd).htm") {
+    Write-Host "File Exists" -ForegroundColor Cyan
+}
+else
+{ Write-Host "File Created!" -ForegroundColor Cyan
+    Get-wmiobject win32_service | Where-Object {$_.state -eq "Running"} | Select Name,Status,@{L='StartupType';E={$_.StartMode}},@{L='FileLocation';E={$_.Path}} | convertto-html | out-file -filepath $HTMLexport\$(get-date -f yyyy-MM-dd).htm
+}
+
+
+if (Test-Path "$JSONexport\$(get-date -f yyyy-MM-dd).json") {
+    Write-Host "File Exists" -ForegroundColor Cyan
+}
+else
+{Write-Host "File Created!" -ForegroundColor Cyan;
+    Get-wmiobject win32_service | Select Name,Status,@{L='StartupType';E={$_.StartMode}},@{L='FileLocation';E={$_.Path}} | ConvertTo-Json | out-file -filepath $JSONexport\$(get-date -f yyyy-MM-dd).json
+}
+
+
+
+#This will check if service reports were created today
+
+$filecheck = get-childitem "C:\Users\Administrator\Desktop\Reports\Report_$(get-date -f yyyy-MM-dd).htm" | Where-Object {$_.LastWriteTime.ToShortDateString() -eq (get-date).ToShortDateString()}
+if ($filecheck.count -eq 1) {
+    write-host 'Service Report was created today.' -ForegroundColor Cyan
+    }
+    Else { 
+        Write-Warning 'Service Report was not created today!'
+        }
+
+        $filecheck = get-childitem "C:\Users\Administrator\Desktop\Reports\Report_details_$(get-date -f yyyy-MM-dd).json" | Where-Object {$_.LastWriteTime.ToShortDateString() -eq (get-date).ToShortDateString()}
+if ($filecheck.count -eq 1) {
+    write-host 'Service Details Report was created today.' -ForegroundColor Cyan
+    }
+    Else { 
+        Write-Warning 'Service Details Report was not created today!' }
+
+
+
+#This will check if the printer spooler has files older than 6 hours and will restart if true
+param(
+$hours = '6'
+)
+
+
+Get-ChildItem C:\Users\Administrator\Desktop\Spooler | Foreach { `
+$creationtime=$_.creationTime; `
+$nowtime = get-date; `
+if (($nowtime - $creationtime).totalhours -lt $hours) `
+{ `
+Write-Host "File created within $hours hours "$_.Name; `
+} `
+else `
+{ `
+Restart-Service -Name Spooler; `
+Write-Host "Print Service Restarted" -ForegroundColor Cyan; `
+} `
+}
+        
+
+
+--------------------------------------------------------------------------------------
+EXTRAS
+
+$PrintSpooler = Get-Service -Name Spooler
+
+# Get the Print Spooler Service status (Running or Stopped)
+$PrintSpooler
+
+# Logic to check Print Spooler Service and restart if not running
+if($PrintSpooler.Status -eq 'stopped')
+
+{
+    # Start Print Spooler Service on local computer
+    Start-Service $PrintSpooler
+}
+
+# Check the Print Spool Service status 
+$PrintSpooler
